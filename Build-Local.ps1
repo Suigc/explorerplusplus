@@ -1,5 +1,5 @@
 param(
-    [ValidateRange(0, 65535)][int]$BuildNumber = 60002,
+    [ValidateRange(0, 65535)][int]$BuildNumber = 60003,
     [string]$VCToolsVersion = '14.44.35207',
     [string]$MSBuildPath,
     [string]$SourceRoot = $PSScriptRoot,
