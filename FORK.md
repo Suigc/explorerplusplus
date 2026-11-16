@@ -24,6 +24,8 @@ The script locates Visual Studio through vswhere, builds x64 Release, and runs t
 
 The executable is produced at Explorer++/Explorer++/x64/Release/Explorer++.exe. Building from this checkout embeds the checked-in custom icon directly; no executable patching is required.
 
+The local build also compiles the Simplified Chinese resources in `Translations/Explorer++ZH_CN` and copies `Explorer++ZH_CN.dll` beside the executable. Keep both files together when deploying: the translation DLL must have exactly the same product version as the executable. Select Simplified Chinese in Tools > Options > General > Language, then restart Explorer++ to apply it. The breadcrumb navigation buttons use the same translated labels as the main toolbar.
+
 ## Recreate the Icon
 
 The original Explorer++ mark is retained at tools/icons/explorerplusplus-original.ico. The folder artwork is sourced from Windows stock resources; Microsoft retains rights to that artwork. This fork's appearance customization is separate from the upstream project's branding.
