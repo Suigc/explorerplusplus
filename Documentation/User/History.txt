@@ -120,6 +120,8 @@ Bug fixes:
   another application can also be found by the Windows shell.
 - Newly created startup tabs now use the configured default view
   settings and column layout, including custom column widths.
+- The folders pane width is now preserved when layout updates
+  occur while minimized or the window is temporarily narrowed.
 - Fixed a crash that could occur on startup when the "Open new
   tabs next to the current one" option was enabled.
 - Fixed a crash that could occur when autosizing columns.
