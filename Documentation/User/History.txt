@@ -4,6 +4,8 @@ Explorer++ Version History
 Version 1.5.0
 -------------
 New features:
+- Local builds now include a matching Simplified Chinese language
+  DLL, with updated navigation labels and translated tab tooltips.
 - The address bar now appears below the tabs, with navigation
   buttons and clickable path segments. Click its blank area to
   enter a path. Ancestors that do not fit appear in a menu.
