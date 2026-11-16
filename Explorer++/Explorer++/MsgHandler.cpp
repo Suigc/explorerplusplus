@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "Explorer++.h"
+#include "AddressBarView.h"
 #include "AppServices.h"
 #include "BrowserCommands.h"
 #include "BrowserList.h"
@@ -391,6 +392,14 @@ void Explorerplusplus::UpdateLayout()
 	SetWindowPos(GetActivePane()->GetTabBar()->GetHWND(), nullptr, 0, 0, tabBackingWidth,
 		tabWindowHeight, SWP_SHOWWINDOW | SWP_NOZORDER);
 
+	auto *addressBarView = m_view.GetAddressBarView();
+	int addressBarHeight = m_config->showAddressBar.get() ? addressBarView->GetHeight() : 0;
+	int addressBarWidth = std::max(0, mainWindowWidth - tabBackingLeft - indentRight);
+	SetWindowPos(addressBarView->GetHWND(), nullptr, tabBackingLeft, indentTop, addressBarWidth,
+		addressBarHeight,
+		(m_config->showAddressBar.get() ? SWP_SHOWWINDOW : SWP_HIDEWINDOW) | SWP_NOZORDER);
+	indentTop += addressBarHeight;
+
 	int foldersPaneTop;
 
 	if (m_config->extendTabControl.get() && !m_config->showTabBarAtBottom.get())
@@ -400,6 +409,10 @@ void Explorerplusplus::UpdateLayout()
 	else
 	{
 		foldersPaneTop = indentRebar;
+		if (m_config->extendTabControl.get())
+		{
+			foldersPaneTop += addressBarHeight;
+		}
 	}
 
 	/* <---- Folders pane + child windows ----> */

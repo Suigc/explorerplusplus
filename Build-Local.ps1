@@ -33,7 +33,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Application build failed.' }
     & $MSBuildPath 'Explorer++\TestExplorer++\TestExplorer++.vcxproj' @properties
     if ($LASTEXITCODE -ne 0) { throw 'Test build failed.' }
-    & '.\Explorer++\TestExplorer++\x64\Release\TestExplorer++.exe' '--gtest_filter=ProcessManager*:*SessionRestorer*'
+    & '.\Explorer++\TestExplorer++\x64\Release\TestExplorer++.exe' '--gtest_filter=AddressBar*:*MainToolbar*:*MainRebar*:ProcessManager*:*SessionRestorer*'
     if ($LASTEXITCODE -ne 0) { throw 'Regression tests failed.' }
 } finally {
     Pop-Location

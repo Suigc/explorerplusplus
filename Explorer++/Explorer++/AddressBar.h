@@ -19,6 +19,7 @@
 #include <vector>
 
 class AsyncIconFetcher;
+class KeyboardState;
 class BrowserWindow;
 class NavigationEvents;
 class NavigationRequest;
@@ -33,7 +34,8 @@ class AddressBar : private AddressBarViewDelegate, public BrowserCommandTarget, 
 public:
 	AddressBar(AddressBarView *view, BrowserWindow *browser, TabEvents *tabEvents,
 		ShellBrowserEvents *shellBrowserEvents, NavigationEvents *navigationEvents,
-		const Runtime *runtime, AsyncIconFetcher *iconFetcher);
+		const Runtime *runtime, AsyncIconFetcher *iconFetcher, const KeyboardState *keyboardState);
+	~AddressBar() override;
 
 	// RebarBand
 	AddressBarView *GetView() override;
@@ -59,6 +61,8 @@ private:
 	bool OnKeyPressed(UINT key) override;
 	void OnBeginDrag() override;
 	void OnFocused() override;
+	void OnBreadcrumbClicked(const PidlAbsolute &pidl, const MouseEvent &event) override;
+	void OnNavigationCommand(int command) override;
 
 	void OnEnterPressed();
 	void OnEscapePressed();
@@ -74,6 +78,7 @@ private:
 	BrowserWindow *const m_browser;
 	const Runtime *const m_runtime;
 	AsyncIconFetcher *const m_iconFetcher;
+	const KeyboardState *const m_keyboardState;
 	ScopedBrowserCommandTarget m_commandTarget;
 	std::vector<boost::signals2::scoped_connection> m_connections;
 	std::unique_ptr<ScopedStopSource> m_scopedStopSource;

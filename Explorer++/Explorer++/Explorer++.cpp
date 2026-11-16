@@ -23,6 +23,7 @@
 #include "MainResource.h"
 #include "MainToolbar.h"
 #include "MainToolbarView.h"
+#include "PlatformContext.h"
 #include "RebarBandStorageData.h"
 #include "ResourceLoader.h"
 #include "Runtime.h"
@@ -102,6 +103,8 @@ Explorerplusplus::~Explorerplusplus() = default;
 void Explorerplusplus::SetUpLayoutConfigListeners()
 {
 	m_connections.push_back(
+		m_config->showAddressBar.addObserver(std::bind(&Explorerplusplus::UpdateLayout, this)));
+	m_connections.push_back(
 		m_config->showStatusBar.addObserver(std::bind(&Explorerplusplus::UpdateLayout, this)));
 	m_connections.push_back(
 		m_config->showFolders.addObserver(std::bind(&Explorerplusplus::UpdateLayout, this)));
@@ -166,8 +169,6 @@ void Explorerplusplus::CreateMainRebarAndChildren(const WindowStorageData &stora
 	std::vector<MainRebar::BandDefinition> bandDefinitions = {
 		{ REBAR_BAND_ID_MAIN_TOOLBAR, m_mainToolbar.get(), &m_config->showMainToolbar,
 			ToolbarOptionsMenu::Source::MainToolbar },
-		{ REBAR_BAND_ID_ADDRESS_BAR, m_addressBar.get(), &m_config->showAddressBar,
-			ToolbarOptionsMenu::Source::AddressBar },
 		{ REBAR_BAND_ID_BOOKMARKS_TOOLBAR, m_bookmarksToolbar.get(),
 			&m_config->showBookmarksToolbar, ToolbarOptionsMenu::Source::BookmarksToolbar },
 		{ REBAR_BAND_ID_DRIVES_TOOLBAR, m_drivesToolbar.get(), &m_config->showDrivesToolbar,
@@ -198,7 +199,10 @@ void Explorerplusplus::CreateAddressBar()
 {
 	m_addressBar = std::make_unique<AddressBar>(m_view.GetAddressBarView(), this, m_tabEvents,
 		m_shellBrowserEvents, m_navigationEvents, m_appServices->GetRuntime(),
-		m_appServices->GetAsyncIconFetcher());
+		m_appServices->GetAsyncIconFetcher(),
+		m_appServices->GetPlatformContext()->GetKeyboardState());
+	m_connections.push_back(m_view.GetAddressBarView()->AddSizeRequirementsChangedObserver(
+		[this] { OnMainRebarHeightChanged(); }));
 }
 
 void Explorerplusplus::CreateBookmarksToolbar()

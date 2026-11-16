@@ -73,6 +73,8 @@ BrowserView::BrowserView(BrowserWindow *browser, const RECT &bounds, AppServices
 	m_mainMenuView = std::make_unique<WindowMenuView>(GetHWND(), m_browser);
 
 	CreateMainRebarAndChildren();
+	m_addressBarView = std::make_unique<AddressBarView>(this, m_config, m_resourceLoader,
+		appServices->GetThemeManager());
 
 	m_foldersPaneView = std::make_unique<FoldersPaneView>(this, m_browser,
 		appServices->GetThemeManager(), m_config, m_resourceLoader);
@@ -140,7 +142,6 @@ void BrowserView::CreateMainRebarAndChildren()
 	m_mainRebarView = std::make_unique<MainRebarView>(this);
 	m_mainToolbarView =
 		std::make_unique<MainToolbarView>(m_mainRebarView.get(), m_browser, m_config);
-	m_addressBarView = std::make_unique<AddressBarView>(m_mainRebarView.get(), m_config);
 	m_bookmarksToolbarView =
 		std::make_unique<BookmarksToolbarView>(m_mainRebarView.get(), m_browser, m_config);
 	m_drivesToolbarView =
