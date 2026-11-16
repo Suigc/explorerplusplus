@@ -4,6 +4,9 @@ Explorer++ Version History
 Version 1.5.0
 -------------
 New features:
+- The address bar now appears below the tabs, with navigation
+  buttons and clickable path segments. Click its blank area to
+  enter a path. Ancestors that do not fit appear in a menu.
 - Dark mode is now available (on Windows 10+) and can be enabled
   via Tools > Options > Appearance > Theme.
 - The background context menu has been updated and the menu items

@@ -5,30 +5,39 @@
 #include "stdafx.h"
 #include "AddressBar.h"
 #include "AsyncIconFetcher.h"
+#include "BrowserCommandController.h"
 #include "BrowserWindow.h"
 #include "NavigationHelper.h"
 #include "RuntimeHelper.h"
 #include "ShellBrowser/NavigationEvents.h"
 #include "ShellBrowser/ShellBrowser.h"
 #include "ShellBrowser/ShellBrowserEvents.h"
+#include "ShellBrowser/ShellNavigationController.h"
 #include "Tab.h"
 #include "TabEvents.h"
 #include "../Helper/DragDropHelper.h"
 #include "../Helper/Helper.h"
+#include "../Helper/KeyboardState.h"
 #include "../Helper/ShellHelper.h"
 #include <glog/logging.h>
 
 AddressBar::AddressBar(AddressBarView *view, BrowserWindow *browser, TabEvents *tabEvents,
 	ShellBrowserEvents *shellBrowserEvents, NavigationEvents *navigationEvents,
-	const Runtime *runtime, AsyncIconFetcher *iconFetcher) :
+	const Runtime *runtime, AsyncIconFetcher *iconFetcher, const KeyboardState *keyboardState) :
 	m_view(view),
 	m_browser(browser),
 	m_runtime(runtime),
 	m_iconFetcher(iconFetcher),
+	m_keyboardState(keyboardState),
 	m_commandTarget(browser->GetCommandTargetManager(), this),
 	m_weakPtrFactory(this)
 {
 	Initialize(tabEvents, shellBrowserEvents, navigationEvents);
+}
+
+AddressBar::~AddressBar()
+{
+	m_view->SetDelegate(nullptr);
 }
 
 void AddressBar::Initialize(TabEvents *tabEvents, ShellBrowserEvents *shellBrowserEvents,
@@ -106,21 +115,15 @@ void AddressBar::OnEnterPressed()
 	m_view->RevertText();
 
 	m_browser->OpenItem(*absolutePath,
-		DetermineOpenDisposition(false, IsKeyDown(VK_CONTROL), IsKeyDown(VK_SHIFT)));
+		DetermineOpenDisposition(false, m_keyboardState->IsCtrlDown(),
+			m_keyboardState->IsShiftDown()));
 	m_browser->FocusActiveTab();
 }
 
 void AddressBar::OnEscapePressed()
 {
-	if (m_view->IsTextModified())
-	{
-		m_view->RevertText();
-		m_view->SelectAllText();
-	}
-	else
-	{
-		m_browser->FocusActiveTab();
-	}
+	m_view->RevertText();
+	m_browser->FocusActiveTab();
 }
 
 void AddressBar::OnBeginDrag()
@@ -133,6 +136,22 @@ void AddressBar::OnBeginDrag()
 void AddressBar::OnFocused()
 {
 	m_commandTarget.TargetFocused();
+}
+
+void AddressBar::OnBreadcrumbClicked(const PidlAbsolute &pidl, const MouseEvent &event)
+{
+	m_browser->OpenItem(pidl.Raw(), DetermineOpenDisposition(false, event.ctrlKey, event.shiftKey));
+	m_browser->FocusActiveTab();
+}
+
+void AddressBar::OnNavigationCommand(int command)
+{
+	auto *controller = m_browser->GetCommandController();
+	if (controller->IsCommandEnabled(command))
+	{
+		controller->ExecuteCommand(command);
+		m_browser->FocusActiveTab();
+	}
 }
 
 void AddressBar::OnTabSelected(const Tab &tab)
@@ -179,6 +198,10 @@ void AddressBar::UpdateTextAndIcon(const ShellBrowser *shellBrowser, IconUpdateT
 
 	auto fullPathForDisplay = GetFolderPathForDisplayWithFallback(pidl.Raw());
 	m_view->UpdateTextAndIcon(fullPathForDisplay, iconIndex);
+	m_view->UpdateDirectory(pidl);
+	auto *navigation = shellBrowser->GetNavigationController();
+	m_view->UpdateNavigationButtons(navigation->CanGoBack(), navigation->CanGoForward(),
+		navigation->CanGoUp());
 }
 
 concurrencpp::null_result AddressBar::RetrieveUpdatedIcon(WeakPtr<AddressBar> weakSelf,
