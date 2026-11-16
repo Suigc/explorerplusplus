@@ -6,6 +6,8 @@
 
 Explorer++ is a lightweight and fast file manager for Windows.
 
+This fork includes file-selection and layout fixes plus a custom folder icon. See [fork notes and local build instructions](FORK.md).
+
 ## Features
 
 * With the option to save to the registry or a configuration file, Explorer++ is __completely portable__
