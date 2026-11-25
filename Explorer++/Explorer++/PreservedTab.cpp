@@ -5,6 +5,7 @@
 #include "stdafx.h"
 #include "PreservedTab.h"
 #include "BrowserWindow.h"
+#include "TabStorage.h"
 
 PreservedTab::PreservedTab(const Tab &tab, int index) :
 	id(tab.GetId()),
@@ -15,4 +16,8 @@ PreservedTab::PreservedTab(const Tab &tab, int index) :
 	lockState(tab.GetLockState()),
 	preservedShellBrowser(tab.GetShellBrowser())
 {
+	if (tab.GetDeferredDevice())
+	{
+		deferredDevice = std::make_shared<TabStorageData>(tab.GetStorageData());
+	}
 }

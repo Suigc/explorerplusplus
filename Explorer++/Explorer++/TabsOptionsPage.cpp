@@ -28,11 +28,16 @@ std::unique_ptr<ResizableDialogHelper> TabsOptionsPage::InitializeResizeDialogHe
 		MovingType::None, SizingType::Horizontal);
 	controls.emplace_back(GetDlgItem(GetDialog(), IDC_TABS_DOUBLECLICKCLOSE), MovingType::None,
 		SizingType::Horizontal);
+	controls.emplace_back(GetDlgItem(GetDialog(), IDC_TABS_COMPRESS), MovingType::None,
+		SizingType::Horizontal);
 	return std::make_unique<ResizableDialogHelper>(GetDialog(), controls);
 }
 
 void TabsOptionsPage::InitializeControls()
 {
+	CheckDlgButton(GetDialog(), IDC_TABS_COMPRESS,
+		m_config->compressTabs.get() ? BST_CHECKED : BST_UNCHECKED);
+
 	if (m_config->showTaskbarThumbnails.get())
 	{
 		CheckDlgButton(GetDialog(), IDC_TABS_TASKBARTHUMBNAILS, BST_CHECKED);
@@ -70,6 +75,7 @@ void TabsOptionsPage::OnCommand(WPARAM wParam, LPARAM lParam)
 	case IDC_TABS_OPENNEXTTOCURRENT:
 	case IDC_SETTINGS_CHECK_ALWAYSNEWTAB:
 	case IDC_TABS_DOUBLECLICKCLOSE:
+	case IDC_TABS_COMPRESS:
 		m_settingChangedCallback();
 		break;
 	}
@@ -77,6 +83,8 @@ void TabsOptionsPage::OnCommand(WPARAM wParam, LPARAM lParam)
 
 void TabsOptionsPage::SaveSettings()
 {
+	m_config->compressTabs = (IsDlgButtonChecked(GetDialog(), IDC_TABS_COMPRESS) == BST_CHECKED);
+
 	m_config->showTaskbarThumbnails =
 		(IsDlgButtonChecked(GetDialog(), IDC_TABS_TASKBARTHUMBNAILS) == BST_CHECKED);
 

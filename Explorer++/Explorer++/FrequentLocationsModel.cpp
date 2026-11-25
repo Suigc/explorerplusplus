@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "FrequentLocationsModel.h"
+#include "../Helper/PidlHelper.h"
 
 FrequentLocationsModel::FrequentLocationsModel(SystemClock *systemClock) :
 	m_systemClock(systemClock)
@@ -13,12 +14,23 @@ FrequentLocationsModel::FrequentLocationsModel(SystemClock *systemClock) :
 void FrequentLocationsModel::SetLocationVisits(const std::vector<LocationVisitInfo> &locationVisits)
 {
 	m_locationVisits.clear();
-	m_locationVisits.insert(locationVisits.begin(), locationVisits.end());
+	for (const auto &visit : locationVisits)
+	{
+		if (!IsPortableDevicePidl(visit.GetLocation().Raw()))
+		{
+			m_locationVisits.insert(visit);
+		}
+	}
 	m_locationsChangedSignal();
 }
 
 void FrequentLocationsModel::RegisterLocationVisit(const PidlAbsolute &pidl)
 {
+	if (IsPortableDevicePidl(pidl.Raw()))
+	{
+		return;
+	}
+
 	auto &locationIndex = m_locationVisits.get<ByLocation>();
 	auto itr = locationIndex.find(pidl);
 

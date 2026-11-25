@@ -5,11 +5,34 @@
 #include "stdafx.h"
 #include "Tab.h"
 #include "Config.h"
+#include "MainResource.h"
+#include "ModelessDialogList.h"
+#include "ResourceLoader.h"
 #include "ShellBrowser/FolderSettings.h"
+#include "ShellBrowser/NavigationEvents.h"
 #include "ShellBrowser/ShellBrowserImpl.h"
 #include "ShellBrowser/ShellNavigationController.h"
 #include "TabEvents.h"
 #include "TabStorage.h"
+#include "../Helper/PidlHelper.h"
+#include "../Helper/WindowSubclass.h"
+#include <boost/algorithm/string/predicate.hpp>
+
+namespace
+{
+
+constexpr UINT WM_RECONNECT_DEVICE = WM_APP + 215;
+
+}
+
+bool IsPortableDeviceTab(const TabStorageData &tab)
+{
+	const bool shellPath =
+		boost::starts_with(tab.directory, L"::") || boost::starts_with(tab.directory, L"\\\\?\\");
+	return tab.portableDevice
+		|| (shellPath && boost::icontains(tab.directory, PORTABLE_DEVICE_INTERFACE_GUID))
+		|| IsPortableDevicePidl(tab.pidl.Raw());
+}
 
 Tab::Tab(std::unique_ptr<ShellBrowser> shellBrowser, BrowserWindow *browser, TabBar *tabBar,
 	TabEvents *tabEvents) :
@@ -50,7 +73,17 @@ Tab::Tab(std::unique_ptr<ShellBrowser> shellBrowser, BrowserWindow *browser, Tab
 	ApplyLockState(initialData.lockState, NotificationMode::DontNotify);
 }
 
-Tab::~Tab() = default;
+Tab::~Tab()
+{
+	if (m_shellBrowserImpl)
+	{
+		m_shellBrowserImpl->SetDeviceConnectionDeferred(false);
+	}
+	if (m_deviceDialogs)
+	{
+		m_deviceDialogs->RemoveDialog(L"device-connection-" + std::to_wstring(m_id));
+	}
+}
 
 int Tab::GetId() const
 {
@@ -84,6 +117,10 @@ std::wstring Tab::GetName() const
 	if (m_useCustomName)
 	{
 		return m_customName;
+	}
+	if (m_deferredDevice)
+	{
+		return m_deferredDevice->displayName;
 	}
 
 	auto *entry = m_shellBrowser->GetNavigationController()->GetCurrentEntry();
@@ -154,10 +191,22 @@ bool Tab::IsLocked() const
 TabStorageData Tab::GetStorageData() const
 {
 	TabStorageData storageData;
-	storageData.pidl = m_shellBrowser->GetDirectory();
-	storageData.directory = m_shellBrowser->GetDirectoryPath();
-	storageData.folderSettings = m_shellBrowser->GetFolderSettings();
-	storageData.columns = m_shellBrowser->GetAllColumnSets();
+	if (m_deferredDevice)
+	{
+		storageData = *m_deferredDevice;
+	}
+	else
+	{
+		storageData.pidl = m_shellBrowser->GetDirectory();
+		storageData.directory = m_shellBrowser->GetDirectoryPath();
+		storageData.folderSettings = m_shellBrowser->GetFolderSettings();
+		storageData.columns = m_shellBrowser->GetAllColumnSets();
+		storageData.portableDevice = IsPortableDeviceTab(storageData);
+		if (storageData.portableDevice)
+		{
+			storageData.displayName = GetName();
+		}
+	}
 
 	TabSettings tabSettings;
 
@@ -171,6 +220,185 @@ TabStorageData Tab::GetStorageData() const
 	storageData.tabSettings = tabSettings;
 
 	return storageData;
+}
+
+const TabStorageData *Tab::GetDeferredDevice() const
+{
+	return m_deferredDevice.get();
+}
+
+void Tab::DeferDeviceConnection(const TabStorageData &storage, const ResourceLoader *resourceLoader,
+	NavigationEvents *navigationEvents, ModelessDialogList *dialogs)
+{
+	m_deferredDevice = std::make_unique<TabStorageData>(storage);
+	m_deferredDevice->portableDevice = true;
+	m_deviceConnectionError = resourceLoader->LoadString(IDS_DEVICE_CONNECTION_FAILED);
+	if (m_deferredDevice->displayName.empty())
+	{
+		m_deferredDevice->displayName = resourceLoader->LoadString(IDS_DEVICE_TAB_TITLE);
+	}
+
+	if (m_shellBrowserImpl)
+	{
+		m_shellBrowserImpl->SetDeviceConnectionDeferred(true);
+		auto listView = m_shellBrowserImpl->GetListView();
+		m_devicePage.reset(resourceLoader->CreateModelessDialog(IDD_DEVICE_CONNECTION, listView,
+			[this, listView](HWND, UINT message, WPARAM wParam, LPARAM)
+			{
+				if (message == WM_COMMAND && LOWORD(wParam) == IDC_DEVICE_RECONNECT)
+				{
+					PostMessage(listView, WM_RECONNECT_DEVICE, 0, 0);
+					return static_cast<INT_PTR>(TRUE);
+				}
+				return static_cast<INT_PTR>(FALSE);
+			}));
+		CHECK(m_devicePage);
+		m_deviceDialogs = dialogs;
+		if (m_deviceDialogs)
+		{
+			m_deviceDialogs->AddDialog(L"device-connection-" + std::to_wstring(m_id),
+				m_devicePage.get());
+		}
+		m_devicePageLayout = std::make_unique<WindowSubclass>(listView,
+			[this](HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) -> LRESULT
+			{
+				if (message == WM_RECONNECT_DEVICE)
+				{
+					ReconnectDevice();
+					return 0;
+				}
+				auto result = DefSubclassProc(hwnd, message, wParam, lParam);
+				if (message == WM_SIZE)
+				{
+					LayoutDevicePage();
+				}
+				return result;
+			});
+		LayoutDevicePage();
+	}
+
+	auto scope = NavigationEventScope::ForShellBrowser(*m_shellBrowser);
+	auto *initialNavigation = m_shellBrowser->MaybeGetLatestActiveNavigation();
+	if (initialNavigation && m_devicePage)
+	{
+		EnableWindow(GetDlgItem(m_devicePage.get(), IDC_DEVICE_RECONNECT), FALSE);
+	}
+	m_deviceConnections.push_back(navigationEvents->AddCommittedObserver(
+		[this, initialNavigation, initialPending = initialNavigation != nullptr](
+			const NavigationRequest *request) mutable
+		{
+			if (initialPending && request == initialNavigation)
+			{
+				initialPending = false;
+				if (m_devicePage)
+				{
+					EnableWindow(GetDlgItem(m_devicePage.get(), IDC_DEVICE_RECONNECT), TRUE);
+				}
+				return;
+			}
+			ClearDeferredDevice();
+		},
+		scope, boost::signals2::at_front, SlotGroup::HighPriority));
+	m_deviceConnections.push_back(navigationEvents->AddFailedObserver(
+		[this](const NavigationRequest *) { ShowDeviceConnectionError(); }, scope));
+	m_deviceConnections.push_back(navigationEvents->AddCancelledObserver(
+		[this](const NavigationRequest *)
+		{
+			if (m_devicePage)
+			{
+				EnableWindow(GetDlgItem(m_devicePage.get(), IDC_DEVICE_RECONNECT), TRUE);
+			}
+		},
+		scope));
+	m_tabEvents->NotifyUpdated(*this, PropertyType::Name);
+}
+
+void Tab::LayoutDevicePage()
+{
+	if (!m_devicePage)
+	{
+		return;
+	}
+	RECT bounds;
+	GetClientRect(m_shellBrowserImpl->GetListView(), &bounds);
+	SetWindowPos(m_devicePage.get(), HWND_TOP, 0, 0, bounds.right, bounds.bottom, SWP_NOACTIVATE);
+	RECT button;
+	GetWindowRect(GetDlgItem(m_devicePage.get(), IDC_DEVICE_RECONNECT), &button);
+	auto width = button.right - button.left;
+	auto height = button.bottom - button.top;
+	SetWindowPos(GetDlgItem(m_devicePage.get(), IDC_DEVICE_MESSAGE), nullptr, 12,
+		std::max(12L, bounds.bottom / 2 - height * 2), std::max(0L, bounds.right - 24), height * 2,
+		SWP_NOZORDER | SWP_NOACTIVATE);
+	SetWindowPos(GetDlgItem(m_devicePage.get(), IDC_DEVICE_RECONNECT), nullptr,
+		std::max(0L, (bounds.right - width) / 2), bounds.bottom / 2 + height, width, height,
+		SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void Tab::ClearDeferredDevice()
+{
+	if (!m_deferredDevice)
+	{
+		return;
+	}
+	m_deferredDevice.reset();
+	if (m_shellBrowserImpl)
+	{
+		m_shellBrowserImpl->SetDeviceConnectionDeferred(false);
+	}
+	if (m_deviceDialogs)
+	{
+		m_deviceDialogs->RemoveDialog(L"device-connection-" + std::to_wstring(m_id));
+		m_deviceDialogs = nullptr;
+	}
+	m_devicePage.reset();
+	m_tabEvents->NotifyUpdated(*this, PropertyType::Name);
+}
+
+void Tab::Focus() const
+{
+	if (m_devicePage)
+	{
+		SetFocus(GetDlgItem(m_devicePage.get(), IDC_DEVICE_RECONNECT));
+	}
+	else if (m_shellBrowserImpl)
+	{
+		SetFocus(m_shellBrowserImpl->GetListView());
+	}
+}
+
+void Tab::ReconnectDevice()
+{
+	if (!m_deferredDevice || m_shellBrowser->MaybeGetLatestActiveNavigation())
+	{
+		return;
+	}
+	auto pidl = m_deferredDevice->pidl;
+	if (!pidl.HasValue())
+	{
+		if (FAILED(SHParseDisplayName(m_deferredDevice->directory.c_str(), nullptr,
+				PidlOutParam(pidl), 0, nullptr)))
+		{
+			ShowDeviceConnectionError();
+			return;
+		}
+	}
+	auto params = NavigateParams::Normal(pidl.Raw(), HistoryEntryType::ReplaceCurrentEntry);
+	params.overrideNavigationTargetMode = true;
+	params.itemsToSelect = m_deferredDevice->itemsToSelect;
+	if (m_devicePage)
+	{
+		EnableWindow(GetDlgItem(m_devicePage.get(), IDC_DEVICE_RECONNECT), FALSE);
+	}
+	m_shellBrowser->GetNavigationController()->Navigate(params);
+}
+
+void Tab::ShowDeviceConnectionError()
+{
+	if (m_devicePage)
+	{
+		SetDlgItemText(m_devicePage.get(), IDC_DEVICE_MESSAGE, m_deviceConnectionError.c_str());
+		EnableWindow(GetDlgItem(m_devicePage.get(), IDC_DEVICE_RECONNECT), TRUE);
+	}
 }
 
 WeakPtr<Tab> Tab::GetWeakPtr()

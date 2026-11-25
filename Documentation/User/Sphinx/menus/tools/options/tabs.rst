@@ -3,6 +3,17 @@ Tabs
 
 .. image:: /_static/images/nav/options-tabs.png
 
+Automatically shrink tabs to fit the tab bar
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Enabled by default. When the tabs exceed the available width, their
+widths are reduced equally. Hover over a tab to see its full path.
+Close buttons are hidden on narrow tabs. Tabs can still be closed
+using their context menu, middle-click, or Ctrl+W.
+
+Disable this option to use content-sized tabs and horizontal scrolling.
+Changes take effect when the settings are applied.
+
 Open new tabs next to the current one
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -8,6 +8,7 @@
 FeatureList::FeatureList(const std::set<Feature> &featuresToEnable) :
 	m_enabledFeatures(featuresToEnable)
 {
+	m_enabledFeatures.insert(Feature::BackgroundThreadEnumeration);
 }
 
 bool FeatureList::IsEnabled(Feature feature) const

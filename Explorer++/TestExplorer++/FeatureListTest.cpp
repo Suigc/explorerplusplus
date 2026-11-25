@@ -19,3 +19,11 @@ TEST(FeatureListTest, Enabled)
 	EXPECT_TRUE(featureList.IsEnabled(Feature::Plugins));
 	EXPECT_FALSE(featureList.IsEnabled(Feature::DualPane));
 }
+
+TEST(FeatureListTest, BackgroundEnumerationEnabledByDefault)
+{
+	FeatureList featureList;
+	EXPECT_TRUE(featureList.IsEnabled(Feature::BackgroundThreadEnumeration));
+	FeatureList withOtherFeatures({ Feature::Plugins });
+	EXPECT_TRUE(withOtherFeatures.IsEnabled(Feature::BackgroundThreadEnumeration));
+}

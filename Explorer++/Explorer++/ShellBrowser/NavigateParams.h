@@ -58,6 +58,9 @@ public:
 	// regardless of the navigation target mode.
 	bool overrideNavigationTargetMode = false;
 
+	// Creates an empty backing view for a deferred device tab.
+	bool skipEnumeration = false;
+
 	// When navigating up, this will store the pidl of the previous item.
 	PidlAbsolute originalPidl;
 

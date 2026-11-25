@@ -42,6 +42,15 @@ BrowserView::BrowserView(BrowserWindow *browser, const RECT &bounds, AppServices
 
 	m_connections.push_back(appServices->GetTabEvents()->AddSelectedObserver(
 		std::bind_front(&BrowserView::OnTabSelected, this), TabEventScope::ForBrowser(*m_browser)));
+	m_connections.push_back(appServices->GetTabEvents()->AddUpdatedObserver(
+		[this](const Tab &tab, Tab::PropertyType)
+		{
+			if (m_browser->IsShellBrowserActive(tab.GetShellBrowser()))
+			{
+				UpdateWindowText();
+			}
+		},
+		TabEventScope::ForBrowser(*m_browser)));
 
 	m_connections.push_back(
 		appServices->GetShellBrowserEvents()->AddDirectoryPropertiesChangedObserver(
@@ -306,7 +315,11 @@ void BrowserView::UpdateWindowText()
 
 	/* Don't show full paths for virtual folders (as only the folders
 	GUID will be shown). */
-	if (m_config->showFullTitlePath.get() && !tab.GetShellBrowserImpl()->InVirtualFolder())
+	if (tab.GetDeferredDevice())
+	{
+		folderDisplayName = tab.GetName();
+	}
+	else if (m_config->showFullTitlePath.get() && !tab.GetShellBrowserImpl()->InVirtualFolder())
 	{
 		GetDisplayName(pidl.Raw(), SHGDN_FORPARSING, folderDisplayName);
 	}

@@ -152,6 +152,9 @@ std::optional<TabStorageData> LoadTabInfo(HKEY key)
 	tabStorageData.folderSettings = LoadFolderSettings(key);
 	tabStorageData.columns = LoadColumns(key);
 	tabStorageData.tabSettings = LoadTabSettings(key);
+	RegistrySettings::Read32BitValueFromRegistry(key, L"PortableDevice",
+		tabStorageData.portableDevice);
+	RegistrySettings::ReadString(key, L"DisplayName", tabStorageData.displayName);
 	return tabStorageData;
 }
 
@@ -216,6 +219,8 @@ void SaveTabInfo(HKEY key, const TabStorageData &tab)
 	SaveFolderSettings(key, tab.folderSettings);
 	SaveColumns(key, tab.columns);
 	SaveTabSettings(key, tab.tabSettings);
+	RegistrySettings::SaveDword(key, L"PortableDevice", tab.portableDevice);
+	RegistrySettings::SaveString(key, L"DisplayName", tab.displayName);
 }
 
 }

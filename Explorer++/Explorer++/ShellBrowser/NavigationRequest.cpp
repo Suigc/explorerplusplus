@@ -106,8 +106,6 @@ concurrencpp::null_result NavigationRequest::StartInternal(WeakPtr<NavigationReq
 
 	weakSelf->m_navigationEvents->NotifyStarted(weakSelf.Get());
 
-	co_await concurrencpp::resume_on(enumerationExecutor);
-
 	// Note that although standard shortcuts (.lnk files) are currently handled outside this class,
 	// symlinks and virtual link objects aren't, so they will be handled here.
 	//
@@ -121,22 +119,26 @@ concurrencpp::null_result NavigationRequest::StartInternal(WeakPtr<NavigationReq
 	// matches the behavior of Explorer. For example, if a symlink to a directory is created and the
 	// target directory is then removed, Explorer will try to navigate to the target, without
 	// attempting to resolve the link.
-	unique_pidl_absolute targetPidl;
-	HRESULT hr = MaybeGetLinkTarget(navigateParams.pidl.Raw(), targetPidl);
-
-	if (SUCCEEDED(hr))
-	{
-		navigateParams.pidl = targetPidl.get();
-	}
-
+	HRESULT hr = S_OK;
 	std::vector<PidlChild> items;
-	hr = shellEnumerator->EnumerateDirectory(navigateParams.pidl.Raw(),
-		ShellItemFilter::ItemType::FoldersAndFiles,
-		showHidden ? ShellItemFilter::HiddenItemPolicy::Include
-				   : ShellItemFilter::HiddenItemPolicy::Exclude,
-		items, stopToken);
+	if (!navigateParams.skipEnumeration)
+	{
+		co_await concurrencpp::resume_on(enumerationExecutor);
 
-	co_await concurrencpp::resume_on(originalExecutor);
+		unique_pidl_absolute targetPidl;
+		hr = MaybeGetLinkTarget(navigateParams.pidl.Raw(), targetPidl);
+		if (SUCCEEDED(hr))
+		{
+			navigateParams.pidl = targetPidl.get();
+		}
+		hr = shellEnumerator->EnumerateDirectory(navigateParams.pidl.Raw(),
+			ShellItemFilter::ItemType::FoldersAndFiles,
+			showHidden ? ShellItemFilter::HiddenItemPolicy::Include
+					   : ShellItemFilter::HiddenItemPolicy::Exclude,
+			items, stopToken);
+
+		co_await concurrencpp::resume_on(originalExecutor);
+	}
 
 	if (!weakSelf)
 	{

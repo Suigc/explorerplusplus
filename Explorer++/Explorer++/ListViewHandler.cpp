@@ -54,6 +54,10 @@ LRESULT Explorerplusplus::OnListViewKeyDown(LPARAM lParam)
 
 void Explorerplusplus::OnListViewPaste()
 {
+	if (GetActivePane()->GetTabBar()->GetSelectedTab().GetDeferredDevice())
+	{
+		return;
+	}
 	auto clipboardObject = m_platformContext->GetClipboardStore()->GetDataObject();
 
 	if (!clipboardObject)

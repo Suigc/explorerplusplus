@@ -36,4 +36,5 @@ TEST_F(ConfigXmlStorageTest, OpenZipFilesSettingMigration)
 	ConfigXmlStorage::Load(xmlDocumentData.rootNode.get(), loadedConfig);
 
 	EXPECT_TRUE(loadedConfig.openContainerFiles);
+	EXPECT_TRUE(loadedConfig.compressTabs.get());
 }

@@ -397,6 +397,13 @@ void AddressBarView::UpdateDirectory(const PidlAbsolute &pidl)
 	Layout();
 }
 
+void AddressBarView::UpdateDeferredDevice(const std::wstring &name)
+{
+	m_breadcrumbs = { { name, {} } };
+	RebuildBreadcrumbButtons();
+	Layout();
+}
+
 void AddressBarView::RebuildBreadcrumbButtons()
 {
 	for (const auto &item : m_breadcrumbToolbar->GetItems())

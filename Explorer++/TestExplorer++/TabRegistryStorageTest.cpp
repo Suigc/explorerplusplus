@@ -39,6 +39,8 @@ TEST_F(TabRegistryStorageTest, Save)
 {
 	std::vector<TabStorageData> referenceTabs;
 	BuildTabStorageLoadSaveReference(referenceTabs, TestStorageType::Registry);
+	referenceTabs[0].portableDevice = true;
+	referenceTabs[0].displayName = L"Phone storage";
 
 	wil::unique_hkey tabsKey;
 	HRESULT hr = wil::reg::create_unique_key_nothrow(m_applicationTestKey.get(), TABS_KEY_NAME,

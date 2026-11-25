@@ -31,6 +31,7 @@
 #include "ShellNavigationController.h"
 #include "SortModes.h"
 #include "SplitFileDialog.h"
+#include "Tab.h"
 #include "ViewModeHelper.h"
 #include "ViewModes.h"
 #include "WildcardSelectDialog.h"
@@ -171,6 +172,16 @@ ShellBrowserImpl::~ShellBrowserImpl()
 	m_columnThreadPool.clear_queue();
 	m_thumbnailThreadPool.clear_queue();
 	m_infoTipsThreadPool.clear_queue();
+}
+
+void ShellBrowserImpl::SetDeviceConnectionDeferred(bool deferred)
+{
+	m_deviceConnectionDeferred = deferred;
+	if (deferred)
+	{
+		m_directoryState.directoryWatcher.reset();
+		m_directoryState.rootDirectoryWatcher.reset();
+	}
 }
 
 HWND ShellBrowserImpl::CreateListView(HWND parent)
@@ -1115,6 +1126,10 @@ void ShellBrowserImpl::RestoreStateOfCutItems()
 
 void ShellBrowserImpl::PasteShortcut()
 {
+	if (m_deviceConnectionDeferred)
+	{
+		return;
+	}
 	auto serviceProvider = winrt::make_self<ServiceProvider>();
 	serviceProvider->RegisterService(IID_IFolderView,
 		winrt::make<FolderView>(m_weakPtrFactory.GetWeakPtr()));
@@ -1125,12 +1140,20 @@ void ShellBrowserImpl::PasteShortcut()
 
 void ShellBrowserImpl::PasteHardLinks()
 {
+	if (m_deviceConnectionDeferred)
+	{
+		return;
+	}
 	auto pastedItems = ClipboardOperations::PasteHardLinks(m_clipboardStore, GetDirectoryPath());
 	OnInternalPaste(pastedItems);
 }
 
 void ShellBrowserImpl::PasteSymLinks()
 {
+	if (m_deviceConnectionDeferred)
+	{
+		return;
+	}
 	auto pastedItems = ClipboardOperations::PasteSymLinks(m_clipboardStore, GetDirectoryPath());
 	OnInternalPaste(pastedItems);
 }
@@ -1170,6 +1193,10 @@ const NavigationManager *ShellBrowserImpl::GetNavigationManager() const
 
 bool ShellBrowserImpl::IsCommandEnabled(int command) const
 {
+	if (m_deviceConnectionDeferred)
+	{
+		return false;
+	}
 	switch (command)
 	{
 	case IDM_FILE_COPYITEMPATH:
@@ -1203,6 +1230,10 @@ bool ShellBrowserImpl::IsCommandEnabled(int command) const
 
 void ShellBrowserImpl::ExecuteCommand(int command)
 {
+	if (m_deviceConnectionDeferred)
+	{
+		return;
+	}
 	switch (command)
 	{
 	case IDM_FILE_COPYITEMPATH:
@@ -1273,11 +1304,19 @@ void ShellBrowserImpl::SetFileAttributesForSelectedItems()
 
 bool ShellBrowserImpl::CanCreateNewFolder() const
 {
+	if (m_deviceConnectionDeferred)
+	{
+		return false;
+	}
 	return CanCreateInDirectory(m_directoryState.pidlDirectory.Raw());
 }
 
 void ShellBrowserImpl::CreateNewFolder()
 {
+	if (!CanCreateNewFolder())
+	{
+		return;
+	}
 	wil::com_ptr_nothrow<IShellItem> directoryShellItem;
 	HRESULT hr = SHCreateItemFromIDList(m_directoryState.pidlDirectory.Raw(),
 		IID_PPV_ARGS(&directoryShellItem));

@@ -10,6 +10,7 @@
 #include "Config.h"
 #include "PopupMenuView.h"
 #include "PreservedTab.h"
+#include "ResourceLoader.h"
 #include "RuntimeHelper.h"
 #include "ShellBrowser/NavigateParams.h"
 #include "ShellBrowser/NavigationEvents.h"
@@ -69,12 +70,20 @@ public:
 
 	std::wstring GetTooltipText() const override
 	{
+		if (auto *device = m_tab->GetDeferredDevice())
+		{
+			return device->directory.empty() ? m_tab->GetName() : device->directory;
+		}
 		const auto &pidlDirectory = m_tab->GetShellBrowser()->GetDirectory();
 		return GetFolderPathForDisplayWithFallback(pidlDirectory.Raw());
 	}
 
 	std::optional<int> GetIconIndex() const override
 	{
+		if (m_tab->GetDeferredDevice())
+		{
+			return m_imageListManager->GetDefaultFolderIconIndex();
+		}
 		if (m_tab->IsLocked())
 		{
 			return m_imageListManager->GetLockIconIndex();
@@ -264,6 +273,15 @@ Tab &TabBar::CreateNewTab(const std::wstring &directory, const TabSettings &tabS
 
 Tab &TabBar::CreateNewTab(const PreservedTab &preservedTab)
 {
+	if (preservedTab.deferredDevice)
+	{
+		auto storage = *preservedTab.deferredDevice;
+		storage.tabSettings.index = preservedTab.browserId == m_browser->GetId()
+			? std::optional<int>(preservedTab.index)
+			: std::nullopt;
+		storage.tabSettings.selected = true;
+		return CreateDeferredDeviceTab(storage);
+	}
 	const auto &preservedShellBrowser = preservedTab.preservedShellBrowser;
 	auto shellBrowser = m_shellBrowserFactory->CreateFromPreserved(preservedShellBrowser);
 	Tab::InitialData initialTabData{ .useCustomName = preservedTab.useCustomName,
@@ -293,6 +311,20 @@ Tab &TabBar::CreateNewTab(const PreservedTab &preservedTab)
 	auto navigateParams =
 		NavigateParams::Normal(entry->GetPidl().Raw(), HistoryEntryType::ReplaceCurrentEntry);
 	return SetUpNewTab(*rawTab, navigateParams, tabSettings);
+}
+
+Tab &TabBar::CreateDeferredDeviceTab(const TabStorageData &storage)
+{
+	PidlAbsolute desktop;
+	FAIL_FAST_IF_FAILED(
+		SHGetKnownFolderIDList(FOLDERID_Desktop, 0, nullptr, PidlOutParam(desktop)));
+	auto params = NavigateParams::Normal(desktop.Raw());
+	params.skipEnumeration = true;
+	auto &tab =
+		CreateNewTab(params, storage.tabSettings, &storage.folderSettings, &storage.columns);
+	tab.DeferDeviceConnection(storage, m_appServices->GetResourceLoader(),
+		m_appServices->GetNavigationEvents(), m_appServices->GetModelessDialogList());
+	return tab;
 }
 
 Tab &TabBar::CreateNewTab(NavigateParams &navigateParams, const TabSettings &tabSettings,
@@ -657,6 +689,10 @@ unique_pidl_absolute TabBar::GetPidlForTargetItem(int targetItem)
 	}
 
 	const auto &tab = GetTabByIndex(targetItem);
+	if (tab.GetDeferredDevice())
+	{
+		return nullptr;
+	}
 	return unique_pidl_absolute(ILCloneFull(tab.GetShellBrowser()->GetDirectory().Raw()));
 }
 

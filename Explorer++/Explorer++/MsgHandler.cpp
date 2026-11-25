@@ -655,7 +655,7 @@ void Explorerplusplus::OnShowHiddenFiles()
 void Explorerplusplus::FocusActiveTab()
 {
 	Tab &selectedTab = GetActivePane()->GetTabBar()->GetSelectedTab();
-	SetFocus(selectedTab.GetShellBrowserImpl()->GetListView());
+	selectedTab.Focus();
 }
 
 bool Explorerplusplus::OnActivate(int activationState, bool minimized)

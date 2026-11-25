@@ -40,6 +40,8 @@ TEST_F(TabXmlStorageTest, Save)
 {
 	std::vector<TabStorageData> referenceTabs;
 	BuildTabStorageLoadSaveReference(referenceTabs, TestStorageType::Xml);
+	referenceTabs[0].portableDevice = true;
+	referenceTabs[0].displayName = L"Phone storage";
 
 	auto xmlDocumentData = CreateXmlDocument();
 

@@ -183,6 +183,13 @@ std::optional<TabStorageData> LoadTabInfo(IXMLDOMNode *tabNode)
 	tabStorageData.folderSettings = LoadFolderSettings(tabNode);
 	tabStorageData.columns = LoadColumns(tabNode);
 	tabStorageData.tabSettings = LoadTabSettings(tabNode);
+	wil::com_ptr_nothrow<IXMLDOMNamedNodeMap> attributes;
+	if (SUCCEEDED(tabNode->get_attributes(&attributes)))
+	{
+		XMLSettings::GetBoolFromMap(attributes.get(), L"PortableDevice",
+			tabStorageData.portableDevice);
+		XMLSettings::GetStringFromMap(attributes.get(), L"DisplayName", tabStorageData.displayName);
+	}
 	return tabStorageData;
 }
 
@@ -253,6 +260,9 @@ void SaveTabInfo(IXMLDOMDocument *xmlDocument, IXMLDOMElement *tabNode, const Ta
 	SaveFolderSettings(xmlDocument, tabNode, tab.folderSettings);
 	SaveColumns(xmlDocument, tabNode, tab.columns);
 	SaveTabSettings(xmlDocument, tabNode, tab.tabSettings);
+	XMLSettings::AddAttributeToNode(xmlDocument, tabNode, L"PortableDevice",
+		XMLSettings::EncodeBoolValue(tab.portableDevice));
+	XMLSettings::AddAttributeToNode(xmlDocument, tabNode, L"DisplayName", tab.displayName.c_str());
 }
 
 }

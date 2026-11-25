@@ -44,6 +44,7 @@
 #include "../Helper/FileActionHandler.h"
 #include "../Helper/Helper.h"
 #include "../Helper/MenuHelper.h"
+#include "../Helper/PidlHelper.h"
 #include "../Helper/ScopedRedrawDisabler.h"
 #include "../Helper/ShellHelper.h"
 #include <wil/common.h>
@@ -293,7 +294,11 @@ void ShellTreeView::AddQuickAccessRootItem()
 		}
 	}
 
-	m_quickAccessRootItem = AddRootItem(quickAccessPidl.get(), TVI_FIRST);
+	// The handle is used to filter children during the initial expansion.
+	m_quickAccessRootItem = AddItem(nullptr, quickAccessPidl.get(), TVI_FIRST);
+	assert(m_quickAccessRootItem);
+	SendMessage(m_hTreeView, TVM_EXPAND, TVE_EXPAND,
+		reinterpret_cast<LPARAM>(m_quickAccessRootItem));
 }
 
 // Typically, something like SHParseDisplayName() will fail if the item doesn't exist. However,
@@ -878,6 +883,19 @@ HRESULT ShellTreeView::ExpandDirectory(HTREEITEM hParent)
 
 HTREEITEM ShellTreeView::AddItem(HTREEITEM parent, PCIDLIST_ABSOLUTE pidl, HTREEITEM insertAfter)
 {
+	if (parent && parent == m_quickAccessRootItem)
+	{
+		if (IsPortableDevicePidl(pidl))
+		{
+			return nullptr;
+		}
+		unique_pidl_absolute target;
+		if (SUCCEEDED(MaybeGetLinkTarget(pidl, target)) && IsPortableDevicePidl(target.get()))
+		{
+			return nullptr;
+		}
+	}
+
 	wil::com_ptr_nothrow<IShellItem2> shellItem;
 	HRESULT hr = SHCreateItemFromIDList(pidl, IID_PPV_ARGS(&shellItem));
 
@@ -1466,6 +1484,10 @@ void ShellTreeView::UpdateSelection()
 	}
 
 	auto *selectedShellBrowser = GetSelectedShellBrowser();
+	if (selectedShellBrowser->GetTab()->GetDeferredDevice())
+	{
+		return;
+	}
 
 	// When locating a folder in the treeview, each of the parent folders has to be enumerated. UNC
 	// paths are contained within the Network folder and that folder can take a significant amount

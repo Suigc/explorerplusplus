@@ -4,6 +4,8 @@ Explorer++ Version History
 Version 1.5.0
 -------------
 New features:
+- Tabs can automatically shrink to fit the tab bar. This can be
+  enabled or disabled in Options > Tabs.
 - Local builds now include a matching Simplified Chinese language
   DLL, with updated navigation labels and translated tab tooltips.
 - The address bar now appears below the tabs, with navigation
@@ -120,6 +122,8 @@ New features:
   environment variable EXPLORERPP_CONFIG.
 
 Bug fixes:
+- Directory enumeration now runs in the background by default,
+  preventing device and network reads from blocking the main UI.
 - File selection requests are now forwarded to an existing
   instance and activate the requested tab. New tabs opened from
   another application can also be found by the Windows shell.
@@ -141,6 +145,10 @@ Bug fixes:
   view. See #460.
 - Fixed a crash that could occur during application shutdown. See
   #388.
+- Restored portable-device tabs now wait for an explicit reconnect,
+  preventing disconnected phones from blocking application startup.
+- Portable-device folders are excluded from frequent locations and
+  the Quick Access tree. Quick Access expands normally on startup.
 - Non US-ASCII characters weren't being properly handled on the
   command line. See #266.
 - Quoted paths are now consistently handled correctly when passed

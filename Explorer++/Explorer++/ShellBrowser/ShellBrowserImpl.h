@@ -78,6 +78,7 @@ public:
 	~ShellBrowserImpl();
 
 	HWND GetListView() const;
+	void SetDeviceConnectionDeferred(bool deferred);
 
 	// ShellBrowser
 	const FolderSettings &GetFolderSettings() const override;
@@ -364,6 +365,7 @@ private:
 
 	static HWND CreateListView(HWND parent);
 	void InitializeListView();
+	bool m_deviceConnectionDeferred = false;
 	void ChangeToInitialFolder();
 	int GenerateUniqueItemId();
 	void MarkItemAsCut(int item, bool cut);

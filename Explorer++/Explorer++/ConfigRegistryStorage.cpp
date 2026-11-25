@@ -70,6 +70,7 @@ void LoadFromKey(HKEY settingsKey, Config &config)
 		config.showTabBarAtBottom);
 	RegistrySettings::Read32BitValueFromRegistry(settingsKey, L"ExtendTabControl",
 		config.extendTabControl);
+	RegistrySettings::Read32BitValueFromRegistry(settingsKey, L"CompressTabs", config.compressTabs);
 	RegistrySettings::ReadEnumValue(settingsKey, L"StartupMode", config.startupMode);
 	RegistrySettings::ReadEnumValue(settingsKey, L"InfoTipType", config.infoTipType);
 	RegistrySettings::ReadEnumValue(settingsKey, L"SizeDisplayFormat",
@@ -263,6 +264,7 @@ void SaveToKey(HKEY settingsKey, const Config &config)
 	RegistrySettings::SaveDword(settingsKey, L"TreeViewDelayEnabled", config.treeViewDelayEnabled);
 	RegistrySettings::SaveDword(settingsKey, L"LockToolbars", config.lockToolbars.get());
 	RegistrySettings::SaveDword(settingsKey, L"ExtendTabControl", config.extendTabControl.get());
+	RegistrySettings::SaveDword(settingsKey, L"CompressTabs", config.compressTabs.get());
 	RegistrySettings::SaveDword(settingsKey, L"UseFullRowSelect", config.useFullRowSelect.get());
 	RegistrySettings::SaveDword(settingsKey, L"ShowFilePreviews", config.showFilePreviews);
 	RegistrySettings::SaveDword(settingsKey, L"ReplaceExplorerMode",

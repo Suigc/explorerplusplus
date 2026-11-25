@@ -10,12 +10,24 @@
 #include "../Helper/ShellHelper.h"
 #include "../Helper/StringHelper.h"
 #include <gtest/gtest.h>
+#include <cstring>
 
 using namespace std::chrono_literals;
 using namespace testing;
 
 namespace
 {
+
+PidlAbsolute BuildOfflineDevicePidl(const std::wstring &folder)
+{
+	const auto path =
+		L"\\\\?\\usb#vid_1234#" + std::wstring(PORTABLE_DEVICE_INTERFACE_GUID) + L"\\" + folder;
+	USHORT itemSize = static_cast<USHORT>(sizeof(USHORT) + (path.size() + 1) * sizeof(wchar_t));
+	std::vector<unsigned char> bytes(itemSize + sizeof(USHORT), 0);
+	std::memcpy(bytes.data(), &itemSize, sizeof(itemSize));
+	std::memcpy(bytes.data() + sizeof(USHORT), path.data(), path.size() * sizeof(wchar_t));
+	return reinterpret_cast<PCIDLIST_ABSOLUTE>(bytes.data());
+}
 
 void BuildTimePoint(int year, int month, int day, int hour, int minute,
 	SystemClock::TimePoint &output)
@@ -216,4 +228,29 @@ TEST_F(FrequentLocationsModelTest, SetLocationVisits)
 	// Once the locations have been added, they should be sorted in descending order of their visit
 	// counts.
 	EXPECT_THAT(m_frequentLocationsModel.GetVisits(), ElementsAre(location2, location3, location1));
+}
+
+TEST_F(FrequentLocationsModelTest, DiscardOfflineDeviceHistoryWithoutShellResolution)
+{
+	// These opaque test identifiers cannot be resolved by the shell.
+	auto alarms = BuildOfflineDevicePidl(L"Alarms");
+	auto movies = BuildOfflineDevicePidl(L"Movies");
+	auto local = CreateSimplePidlForTest(L"c:\\work");
+	m_frequentLocationsModel.SetLocationVisits({ { alarms, 7, SystemClock::TimePoint(0s) },
+		{ movies, 5, SystemClock::TimePoint(0s) }, { local, 3, SystemClock::TimePoint(0s) } });
+
+	const auto &visits = m_frequentLocationsModel.GetVisits();
+	ASSERT_EQ(visits.size(), 1);
+	EXPECT_EQ(visits.begin()->GetNumVisits(), 3);
+	EXPECT_EQ(visits.begin()->GetLocation(), local);
+}
+
+TEST_F(FrequentLocationsModelTest, IgnoreNewDeviceVisits)
+{
+	MockFunction<void()> callback;
+	m_frequentLocationsModel.AddLocationsChangedObserver(callback.AsStdFunction());
+	EXPECT_CALL(callback, Call()).Times(0);
+	m_frequentLocationsModel.RegisterLocationVisit(BuildOfflineDevicePidl(L"Alarms"));
+	m_frequentLocationsModel.RegisterLocationVisit(BuildOfflineDevicePidl(L"Movies"));
+	EXPECT_TRUE(m_frequentLocationsModel.GetVisits().empty());
 }

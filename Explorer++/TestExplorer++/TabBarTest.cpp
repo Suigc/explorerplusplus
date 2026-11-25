@@ -11,6 +11,7 @@
 #include "ShellBrowser/ShellBrowser.h"
 #include "ShellBrowser/ShellNavigationController.h"
 #include "TabBarView.h"
+#include "TabStorage.h"
 #include "TabViewTestApi.h"
 #include <gtest/gtest.h>
 
@@ -26,6 +27,24 @@ protected:
 	BrowserWindowFake *const m_browser;
 	TabBar *const m_tabBar;
 };
+
+TEST_F(TabBarTest, DeferredDeviceCanBeDuplicatedWithoutConnecting)
+{
+	TabStorageData storage;
+	storage.directory = L"unavailable-device";
+	storage.displayName = L"Phone files";
+	storage.portableDevice = true;
+	storage.tabSettings.selected = true;
+	auto &tab = m_tabBar->CreateDeferredDeviceTab(storage);
+	auto &copy = m_tabBar->DuplicateTab(tab);
+
+	ASSERT_NE(tab.GetDeferredDevice(), nullptr);
+	ASSERT_NE(copy.GetDeferredDevice(), nullptr);
+	EXPECT_EQ(copy.GetDeferredDevice()->directory, storage.directory);
+	EXPECT_EQ(copy.GetName(), storage.displayName);
+	EXPECT_EQ(m_tabBar->GetNumTabs(), 2);
+	EXPECT_TRUE(m_tabBar->IsTabSelected(copy));
+}
 
 TEST_F(TabBarTest, TabSettingsOnCreation)
 {

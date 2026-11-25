@@ -12,6 +12,7 @@
 #include "ShellBrowser/ShellBrowser.h"
 #include "ShellBrowser/ShellNavigationController.h"
 #include "Tab.h"
+#include "TabStorage.h"
 #include "ToolbarView.h"
 #include "../Helper/ShellHelper.h"
 #include <gtest/gtest.h>
@@ -53,6 +54,25 @@ protected:
 	std::unique_ptr<AddressBarView> m_addressBarView;
 	std::unique_ptr<AddressBar> m_addressBar;
 };
+
+TEST_F(AddressBarTest, DeferredDeviceHasInertBreadcrumb)
+{
+	TabStorageData storage;
+	storage.directory = L"unavailable-device";
+	storage.displayName = L"Phone files";
+	storage.portableDevice = true;
+	storage.tabSettings.selected = true;
+	auto &tab = m_browser->GetActiveTabBar()->CreateDeferredDeviceTab(storage);
+
+	EXPECT_EQ(m_addressBarView->GetText(), storage.displayName);
+	const auto &crumbs = m_addressBarView->GetBreadcrumbsForTesting();
+	ASSERT_EQ(crumbs.size(), 1);
+	EXPECT_EQ(crumbs[0].text, storage.displayName);
+	EXPECT_FALSE(crumbs[0].pidl.HasValue());
+	m_addressBarView->GetDelegateForTesting()->OnBreadcrumbClicked(crumbs[0].pidl,
+		MouseEvent({}, false, false));
+	EXPECT_NE(tab.GetDeferredDevice(), nullptr);
+}
 
 TEST_F(AddressBarTest, DisplayUpdateAfterNavigation)
 {

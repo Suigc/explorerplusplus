@@ -47,6 +47,7 @@ public:
 	void RevertText();
 	void ShowDropDown();
 	void UpdateDirectory(const PidlAbsolute &pidl);
+	void UpdateDeferredDevice(const std::wstring &name);
 	void UpdateNavigationButtons(bool canGoBack, bool canGoForward, bool canGoUp);
 
 	AddressBarViewDelegate *GetDelegateForTesting();

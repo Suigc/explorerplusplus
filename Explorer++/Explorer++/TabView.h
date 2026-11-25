@@ -198,6 +198,7 @@ private:
 	void OnMiddleButtonUp(const POINT &pt, UINT keysDown);
 	void OnRightButtonUp(const POINT &pt, UINT keysDown);
 	void UpdateDpiDependentResources();
+	void UpdateTabWidths();
 	void OnPaint();
 	void Paint(HDC hdc, const RECT &paintRect);
 	void DrawTab(HDC hdc, int index);
@@ -212,6 +213,8 @@ private:
 
 	const ThemeManager *const m_themeManager;
 	const ResourceLoader *const m_resourceLoader;
+	const Config *const m_config;
+	boost::signals2::scoped_connection m_compressTabsConnection;
 	std::vector<std::unique_ptr<TabViewItem>> m_tabs;
 	TabViewDelegate *m_delegate = nullptr;
 	MainFontSetter m_fontSetter;

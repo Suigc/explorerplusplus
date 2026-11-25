@@ -6,6 +6,7 @@
 #include "ShellBrowserImpl.h"
 #include "FolderView.h"
 #include "ServiceProvider.h"
+#include "Tab.h"
 #include "ViewModes.h"
 #include "../Helper/ListViewHelper.h"
 #include "../Helper/ShellHelper.h"
@@ -55,6 +56,10 @@ int ShellBrowserImpl::GetDropTargetItem(const POINT &pt)
 
 unique_pidl_absolute ShellBrowserImpl::GetPidlForTargetItem(int targetItem)
 {
+	if (m_deviceConnectionDeferred)
+	{
+		return nullptr;
+	}
 	if (targetItem != -1)
 	{
 		auto &item = GetItemByIndex(targetItem);

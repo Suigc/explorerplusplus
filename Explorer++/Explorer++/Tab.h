@@ -6,7 +6,10 @@
 
 #include "../Helper/WeakPtrFactory.h"
 #include <boost/core/noncopyable.hpp>
+#include <boost/signals2.hpp>
+#include <wil/resource.h>
 #include <memory>
+#include <vector>
 
 class BrowserWindow;
 class ShellBrowser;
@@ -14,6 +17,10 @@ class ShellBrowserImpl;
 class TabBar;
 class TabEvents;
 struct TabStorageData;
+class NavigationEvents;
+class ResourceLoader;
+class WindowSubclass;
+class ModelessDialogList;
 
 class Tab : private boost::noncopyable
 {
@@ -70,6 +77,11 @@ public:
 	bool IsLocked() const;
 
 	TabStorageData GetStorageData() const;
+	const TabStorageData *GetDeferredDevice() const;
+	void DeferDeviceConnection(const TabStorageData &storage, const ResourceLoader *resourceLoader,
+		NavigationEvents *navigationEvents, ModelessDialogList *dialogs = nullptr);
+	void ReconnectDevice();
+	void Focus() const;
 
 	WeakPtr<Tab> GetWeakPtr();
 
@@ -88,6 +100,9 @@ private:
 	};
 
 	void ApplyLockState(LockState lockState, NotificationMode notificationMode);
+	void LayoutDevicePage();
+	void ClearDeferredDevice();
+	void ShowDeviceConnectionError();
 
 	static inline int idCounter = 1;
 	const int m_id;
@@ -102,6 +117,12 @@ private:
 	bool m_useCustomName;
 	std::wstring m_customName;
 	LockState m_lockState;
+	std::unique_ptr<TabStorageData> m_deferredDevice;
+	wil::unique_hwnd m_devicePage;
+	std::unique_ptr<WindowSubclass> m_devicePageLayout;
+	std::vector<boost::signals2::scoped_connection> m_deviceConnections;
+	ModelessDialogList *m_deviceDialogs = nullptr;
+	std::wstring m_deviceConnectionError;
 
 	WeakPtrFactory<Tab> m_weakPtrFactory{ this };
 };

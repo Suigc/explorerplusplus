@@ -26,6 +26,7 @@
 #include "ShellItemContextMenu.h"
 #include "ShellNavigationController.h"
 #include "ShellView.h"
+#include "Tab.h"
 #include "../Helper/CachedIcons.h"
 #include "../Helper/DragDropHelper.h"
 #include "../Helper/FileActionHandler.h"
@@ -71,6 +72,11 @@ std::vector<ColumnType> GetColumnHeaderMenuList(const std::wstring &directory);
 
 LRESULT ShellBrowserImpl::ListViewProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+	if (m_deviceConnectionDeferred
+		&& (uMsg == WM_KEYDOWN || uMsg == WM_CHAR || uMsg == WM_CONTEXTMENU))
+	{
+		return 0;
+	}
 	switch (uMsg)
 	{
 	// NM_DBLCLK for the listview is sent both on double clicks (by default), as well as in the

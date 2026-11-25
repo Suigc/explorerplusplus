@@ -15,6 +15,8 @@ struct TabStorageData
 	// persisting data to the config file.
 	PidlAbsolute pidl;
 	std::wstring directory;
+	bool portableDevice = false;
+	std::wstring displayName;
 
 	TabSettings tabSettings;
 	FolderSettings folderSettings;
@@ -26,3 +28,6 @@ struct TabStorageData
 	// This is only used in tests.
 	bool operator==(const TabStorageData &) const = default;
 };
+
+// Uses saved data only, so disconnected devices are never contacted.
+bool IsPortableDeviceTab(const TabStorageData &tab);

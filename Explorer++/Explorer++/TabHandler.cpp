@@ -150,6 +150,15 @@ void Explorerplusplus::CreateTabsFromStorageData(const WindowStorageData &storag
 		auto tabSettings = loadedTab.tabSettings;
 		tabSettings.index = index;
 
+		if (IsPortableDeviceTab(loadedTab))
+		{
+			auto device = loadedTab;
+			device.tabSettings = tabSettings;
+			GetActivePane()->GetTabBar()->CreateDeferredDeviceTab(device);
+			index++;
+			continue;
+		}
+
 		auto validatedColumns = loadedTab.columns;
 		ValidateColumns(validatedColumns);
 
@@ -197,7 +206,7 @@ void Explorerplusplus::OnTabSelected(const Tab &tab)
 
 	/* Show the new listview. */
 	ShowWindow(m_hActiveListView, SW_SHOW);
-	SetFocus(m_hActiveListView);
+	tab.Focus();
 }
 
 void Explorerplusplus::ShowTabBar()

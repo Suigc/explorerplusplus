@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "TabView.h"
+#include "Config.h"
 #include "Icon.h"
 #include "MainResource.h"
 #include "ResourceLoader.h"
@@ -91,6 +92,7 @@ TabView::TabView(ViewBase *parent, DWORD style, const ThemeManager *themeManager
 	ViewBase(CreateTabControl(parent->GetHWND(), style)),
 	m_themeManager(themeManager),
 	m_resourceLoader(resourceLoader),
+	m_config(config),
 	m_fontSetter(GetHWND(), config, GetDefaultSystemFontForDefaultDpi())
 {
 	auto tooltipControl = TabCtrl_GetToolTips(GetHWND());
@@ -108,6 +110,8 @@ TabView::TabView(ViewBase *parent, DWORD style, const ThemeManager *themeManager
 		std::bind_front(&TabView::ParentWndProc, this)));
 
 	m_fontSetter.fontUpdatedSignal.AddObserver(std::bind_front(&TabView::OnFontUpdated, this));
+	m_compressTabsConnection =
+		m_config->compressTabs.addObserver([this](bool) { UpdateTabWidths(); });
 }
 
 TabView::~TabView() = default;
@@ -132,6 +136,7 @@ int TabView::AddTab(std::unique_ptr<TabViewItem> tabItem, int index)
 
 	tabItem->SetParent(this);
 	m_tabs.push_back(std::move(tabItem));
+	UpdateTabWidths();
 
 	return insertedIndex;
 }
@@ -156,6 +161,7 @@ void TabView::UpdateTab(const TabViewItem *tabItem)
 	{
 		MaybeRemoveIcon(*originalIconIndex);
 	}
+	UpdateTabWidths();
 }
 
 int TabView::MoveTab(int fromIndex, int toIndex)
@@ -205,6 +211,7 @@ void TabView::RemoveTab(int index)
 	{
 		MaybeRemoveIcon(*iconIndex);
 	}
+	UpdateTabWidths();
 }
 
 std::optional<int> TabView::MaybeGetTabIconIndex(int index) const
@@ -334,9 +341,17 @@ LRESULT TabView::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 	case WM_DPICHANGED_AFTERPARENT:
 		UpdateDpiDependentResources();
+		UpdateTabWidths();
 		InvalidateRect(GetHWND(), nullptr, false);
 		sizeUpdatedSignal.m_signal();
 		break;
+
+	case WM_SIZE:
+	{
+		auto result = DefSubclassProc(hwnd, msg, wParam, lParam);
+		UpdateTabWidths();
+		return result;
+	}
 
 	case WM_ERASEBKGND:
 		return 1;
@@ -745,6 +760,38 @@ void TabView::UpdateDpiDependentResources()
 	TabCtrl_SetPadding(GetHWND(), finalHorizontalPadding, verticalPadding);
 }
 
+void TabView::UpdateTabWidths()
+{
+	// Measure the native, content-sized tabs before deciding whether to compress them.
+	SetWindowStyles(GetHWND(), TCS_FIXEDWIDTH, false);
+	// Zero dimensions restore automatic sizing for the current font and DPI.
+	TabCtrl_SetItemSize(GetHWND(), 0, 0);
+	TabCtrl_SetMinTabWidth(GetHWND(), -1);
+
+	int count = GetNumTabs();
+	RECT client;
+	GetClientRect(GetHWND(), &client);
+	if (!m_config->compressTabs.get() || count == 0 || client.right <= 4)
+	{
+		InvalidateRect(GetHWND(), nullptr, false);
+		return;
+	}
+
+	auto first = GetTabRect(0);
+	auto last = GetTabRect(count - 1);
+	int availableWidth = client.right - 4;
+	if (last.right - first.left > availableWidth)
+	{
+		SetWindowStyles(GetHWND(), TCS_FIXEDWIDTH, true);
+		TabCtrl_SetMinTabWidth(GetHWND(), 0);
+		TabCtrl_SetItemSize(GetHWND(), std::max(1, availableWidth / count),
+			first.bottom - first.top);
+		// Reset any offset left over from restoring a tab near the end of a saved session.
+		SendMessage(GetHWND(), WM_HSCROLL, MAKEWPARAM(SB_THUMBPOSITION, 0), 0);
+	}
+	InvalidateRect(GetHWND(), nullptr, false);
+}
+
 void TabView::OnPaint()
 {
 	DoubleBufferedPaint doubleBufferedPaint(GetHWND());
@@ -877,6 +924,8 @@ void TabView::DrawTab(HDC hdc, int index)
 	DCHECK_EQ(status, Gdiplus::Ok);
 
 	auto layout = GetTabContentLayout(index);
+	ScopedDCState contentState(hdc);
+	IntersectClipRect(hdc, itemRect.left, itemRect.top, itemRect.right, itemRect.bottom);
 
 	auto imageList = TabCtrl_GetImageList(GetHWND());
 
@@ -885,7 +934,7 @@ void TabView::DrawTab(HDC hdc, int index)
 	auto getItemRes = TabCtrl_GetItem(GetHWND(), index, &tcItem);
 	CHECK(getItemRes);
 
-	if (imageList && tcItem.iImage != -1)
+	if (imageList && tcItem.iImage != -1 && !IsRectEmpty(&layout.icon))
 	{
 		auto drawRes = ImageList_Draw(imageList, tcItem.iImage, hdc, layout.icon.left,
 			layout.icon.top, ILD_NORMAL);
@@ -897,8 +946,16 @@ void TabView::DrawTab(HDC hdc, int index)
 	DCHECK_NE(colorRes, CLR_INVALID);
 
 	auto text = TabHelper::GetItemText(GetHWND(), index);
-	res = DrawText(hdc, text.c_str(), -1, &layout.text, DT_VCENTER | DT_SINGLELINE);
-	DCHECK_NE(res, 0);
+	if (!IsRectEmpty(&layout.text))
+	{
+		DrawText(hdc, text.c_str(), -1, &layout.text,
+			DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+	}
+
+	if (IsRectEmpty(&layout.closeButton))
+	{
+		return;
+	}
 
 	IMAGELISTDRAWPARAMS params = {};
 	params.cbSize = sizeof(params);
@@ -918,7 +975,8 @@ void TabView::DrawTab(HDC hdc, int index)
 TabView::TabContentLayout TabView::GetTabContentLayout(int index) const
 {
 	auto itemRect = GetTabRectForPainting(index);
-	InflateRect(&itemRect, -m_horizontalPadding, 0);
+	int padding = std::min(m_horizontalPadding, GetRectWidth(&itemRect) / 8);
+	InflateRect(&itemRect, -padding, 0);
 
 	HorizontalLayout row(itemRect);
 	TabContentLayout layout = {};
@@ -937,8 +995,11 @@ TabView::TabContentLayout TabView::GetTabContentLayout(int index) const
 		auto res = ImageList_GetIconSize(imageList, &iconWidth, &iconHeight);
 		CHECK(res);
 
-		layout.icon = CenterVertically(row.TakeLeft(iconWidth), iconHeight);
-		row.TakeLeft(m_horizontalPadding);
+		if (GetRectWidth(&itemRect) >= iconWidth + padding)
+		{
+			layout.icon = CenterVertically(row.TakeLeft(iconWidth), iconHeight);
+			row.TakeLeft(padding);
+		}
 	}
 
 	int closeIconWidth;
@@ -946,8 +1007,13 @@ TabView::TabContentLayout TabView::GetTabContentLayout(int index) const
 	auto res = ImageList_GetIconSize(m_closeIconImageList.get(), &closeIconWidth, &closeIconHeight);
 	CHECK(res);
 
-	layout.closeButton = CenterVertically(row.TakeRight(closeIconWidth), closeIconHeight);
-	row.TakeRight(m_horizontalPadding);
+	auto remaining = row.Remaining();
+	int minimumTextWidth = HasWindowStyles(GetHWND(), TCS_FIXEDWIDTH) ? m_horizontalPadding * 4 : 0;
+	if (GetRectWidth(&remaining) >= closeIconWidth + padding + minimumTextWidth)
+	{
+		layout.closeButton = CenterVertically(row.TakeRight(closeIconWidth), closeIconHeight);
+		row.TakeRight(padding);
+	}
 
 	layout.text = row.Remaining();
 	return layout;
@@ -1035,5 +1101,6 @@ std::optional<int> TabView::MaybeGetIndexOfTabAtPoint(const POINT &pt) const
 
 void TabView::OnFontUpdated()
 {
+	UpdateTabWidths();
 	sizeUpdatedSignal.m_signal();
 }

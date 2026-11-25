@@ -139,7 +139,7 @@ void Explorerplusplus::Initialize(const WindowStorageData &storageData)
 
 	CreateInitialTabs(storageData);
 
-	SetFocus(m_hActiveListView);
+	FocusActiveTab();
 
 	SetLifecycleState(LifecycleState::Main);
 }

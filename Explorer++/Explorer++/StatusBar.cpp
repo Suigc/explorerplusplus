@@ -27,6 +27,15 @@ StatusBar::StatusBar(StatusBarView *view, const BrowserWindow *browser, const Co
 	m_resourceLoader(resourceLoader)
 {
 	SetStandardParts();
+	m_connections.push_back(tabEvents->AddUpdatedObserver(
+		[this](const Tab &tab, Tab::PropertyType)
+		{
+			if (m_browser->IsShellBrowserActive(tab.GetShellBrowser()))
+			{
+				UpdateText(tab);
+			}
+		},
+		TabEventScope::ForBrowser(*browser)));
 
 	m_connections.push_back(tabEvents->AddSelectedObserver(
 		std::bind_front(&StatusBar::OnTabSelected, this), TabEventScope::ForBrowser(*browser)));
@@ -136,6 +145,14 @@ void StatusBar::UpdateText(const Tab &tab)
 	{
 		// If menu help text is being shown, there's no need to update the status bar text for the
 		// current tab.
+		return;
+	}
+
+	if (tab.GetDeferredDevice())
+	{
+		m_view->SetPartText(0, tab.GetName());
+		m_view->SetPartText(1, L"");
+		m_view->SetPartText(2, L"");
 		return;
 	}
 

@@ -21,4 +21,5 @@ struct PreservedTab : private boost::noncopyable
 	const Tab::LockState lockState;
 
 	const PreservedShellBrowser preservedShellBrowser;
+	std::shared_ptr<const TabStorageData> deferredDevice;
 };

@@ -2,6 +2,12 @@
 // Microsoft Visual C++ generated include file.
 // Used by Explorer++.rc
 //
+#define IDD_DEVICE_CONNECTION          663
+#define IDS_DEVICE_TAB_TITLE           664
+#define IDS_DEVICE_CONNECTION_FAILED   665
+#define IDC_DEVICE_MESSAGE             1376
+#define IDC_DEVICE_RECONNECT           1377
+#define IDC_TABS_COMPRESS              1378
 #define IDD_OPTIONS_FILES_FOLDERS       9
 #define IDD_MANAGE_BOOKMARKS            10
 #define IDD_HELPFILEMISSING             16
@@ -1052,12 +1058,12 @@
 #define IDM_VIEW_TILES                  60009
 
 // Next default values for new objects
-// 
+//
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        663
+#define _APS_NEXT_RESOURCE_VALUE        666
 #define _APS_NEXT_COMMAND_VALUE         40556
-#define _APS_NEXT_CONTROL_VALUE         1376
+#define _APS_NEXT_CONTROL_VALUE         1379
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

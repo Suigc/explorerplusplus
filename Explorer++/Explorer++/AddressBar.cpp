@@ -44,6 +44,15 @@ void AddressBar::Initialize(TabEvents *tabEvents, ShellBrowserEvents *shellBrows
 	NavigationEvents *navigationEvents)
 {
 	m_view->SetDelegate(this);
+	m_connections.push_back(tabEvents->AddUpdatedObserver(
+		[this](const Tab &tab, Tab::PropertyType)
+		{
+			if (m_browser->IsShellBrowserActive(tab.GetShellBrowser()))
+			{
+				UpdateTextAndIcon(tab.GetShellBrowser(), IconUpdateType::AlwaysFetch);
+			}
+		},
+		TabEventScope::ForBrowser(*m_browser)));
 
 	m_connections.push_back(tabEvents->AddSelectedObserver(
 		std::bind_front(&AddressBar::OnTabSelected, this), TabEventScope::ForBrowser(*m_browser)));
@@ -130,6 +139,10 @@ void AddressBar::OnBeginDrag()
 {
 	const auto *shellBrowser = m_browser->GetActiveShellBrowser();
 	const auto &pidl = shellBrowser->GetDirectory();
+	if (auto *tab = shellBrowser->GetTab(); tab && tab->GetDeferredDevice())
+	{
+		return;
+	}
 	StartDragForShellItems({ pidl.Raw() }, DROPEFFECT_LINK);
 }
 
@@ -140,6 +153,10 @@ void AddressBar::OnFocused()
 
 void AddressBar::OnBreadcrumbClicked(const PidlAbsolute &pidl, const MouseEvent &event)
 {
+	if (!pidl.HasValue())
+	{
+		return;
+	}
 	m_browser->OpenItem(pidl.Raw(), DetermineOpenDisposition(false, event.ctrlKey, event.shiftKey));
 	m_browser->FocusActiveTab();
 }
@@ -178,6 +195,13 @@ void AddressBar::UpdateTextAndIcon(const ShellBrowser *shellBrowser, IconUpdateT
 	m_scopedStopSource = std::make_unique<ScopedStopSource>();
 
 	const auto &pidl = shellBrowser->GetDirectory();
+	if (auto *tab = shellBrowser->GetTab(); tab && tab->GetDeferredDevice())
+	{
+		m_view->UpdateTextAndIcon(tab->GetName(), m_iconFetcher->GetDefaultIconIndex(pidl.Raw()));
+		m_view->UpdateDeferredDevice(tab->GetName());
+		m_view->UpdateNavigationButtons(false, false, false);
+		return;
+	}
 
 	auto cachedIconIndex = m_iconFetcher->MaybeGetCachedIconIndex(pidl.Raw());
 	int iconIndex;

@@ -22,6 +22,10 @@
 
 void ShellBrowserImpl::StartDirectoryMonitoring()
 {
+	if (m_deviceConnectionDeferred)
+	{
+		return;
+	}
 	m_directoryState.directoryWatcher = m_appServices->GetDirectoryWatcherFactory()->MaybeCreate(
 		m_directoryState.pidlDirectory, DirectoryWatcher::Filters::All,
 		std::bind_front(&ShellBrowserImpl::ProcessDirectoryChangeNotification, this),
@@ -47,6 +51,10 @@ void ShellBrowserImpl::StartDirectoryMonitoring()
 void ShellBrowserImpl::ProcessDirectoryChangeNotification(DirectoryWatcher::Event event,
 	const PidlAbsolute &simplePidl1, const PidlAbsolute &simplePidl2)
 {
+	if (m_deviceConnectionDeferred)
+	{
+		return;
+	}
 	switch (event)
 	{
 	case DirectoryWatcher::Event::Added:

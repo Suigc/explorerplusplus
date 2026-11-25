@@ -82,6 +82,22 @@ TEST_F(NavigationRequestTest, StartedState)
 	EXPECT_EQ(request->GetState(), NavigationRequest::State::Started);
 }
 
+TEST_F(NavigationRequestTest, DeferredViewDoesNotEnumerate)
+{
+	m_shellEnumerator->SetShouldSucceed(false);
+	auto pidl = CreateSimplePidlForTest(L"c:\\unavailable");
+	auto params = NavigateParams::Normal(pidl.Raw());
+	params.skipEnumeration = true;
+	auto request = MakeNavigationRequest(params);
+	auto *delegate = static_cast<NavigationRequestDelegateMock *>(GetDelegate());
+	EXPECT_CALL(*delegate, OnEnumerationCompleted(request.get()));
+	EXPECT_CALL(*delegate, OnEnumerationFailed).Times(0);
+	request->Start();
+	EXPECT_EQ(request->GetState(), NavigationRequest::State::EnumerationFinished);
+	RunExecutors();
+	EXPECT_TRUE(request->GetItems().empty());
+}
+
 TEST_F(NavigationRequestTest, CommittedState)
 {
 	auto request = MakeNavigationRequestForStateTest();

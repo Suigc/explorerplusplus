@@ -51,8 +51,14 @@ public:
 		return m_iconIndex;
 	}
 
+	void SetTitle(const std::wstring &title)
+	{
+		m_title = title;
+		NotifyParentOfUpdate();
+	}
+
 private:
-	const std::wstring m_title;
+	std::wstring m_title;
 	const std::optional<int> m_iconIndex;
 };
 
@@ -195,6 +201,80 @@ TEST_F(TabViewTest, SelectOnClick)
 	layout = m_testApi.GetTabContentLayout(0);
 	SimulateClick(m_view.GetHWND(), { layout.closeButton.left, layout.closeButton.top });
 	EXPECT_EQ(m_view.GetSelectedIndex(), 1);
+}
+
+TEST_F(TabViewTest, CompressManyTabs)
+{
+	MoveWindow(m_view.GetHWND(), 0, 0, 1200, 30, false);
+	auto items = AddTabs(std::vector<std::wstring>(77, L"A long folder name"));
+	m_view.SelectTabAtIndex(75);
+
+	EXPECT_EQ(m_view.GetNumTabs(), 77);
+	EXPECT_GE(m_testApi.GetTabRect(0).left, 0);
+	EXPECT_LE(m_testApi.GetTabRect(76).right, 1200);
+	for (int index = 0; index < m_view.GetNumTabs(); index++)
+	{
+		auto rect = m_testApi.GetTabRect(index);
+		EXPECT_GT(rect.right, rect.left);
+		auto layout = m_testApi.GetTabContentLayout(index);
+		EXPECT_LE(layout.text.left, layout.text.right);
+		EXPECT_TRUE(IsRectEmpty(&layout.closeButton));
+	}
+
+	// A narrow tab must remain selectable instead of acting as an invisible close button.
+	auto first = m_testApi.GetTabRect(0);
+	SimulateClick(m_view.GetHWND(), { (first.left + first.right) / 2, first.top + 4 });
+	EXPECT_EQ(m_view.GetSelectedIndex(), 0);
+	VerifyTabs(items);
+}
+
+TEST_F(TabViewTest, ToggleCompression)
+{
+	MoveWindow(m_view.GetHWND(), 0, 0, 400, 30, false);
+	AddTabs(std::vector<std::wstring>(8, L"A long folder name"));
+	EXPECT_LE(m_testApi.GetTabRect(7).right, 400);
+
+	m_config.compressTabs = false;
+	m_view.SelectTabAtIndex(7);
+	EXPECT_LT(m_testApi.GetTabRect(0).left, 0);
+	EXPECT_GT(m_testApi.GetTabRect(7).right - m_testApi.GetTabRect(0).left, 400);
+
+	m_config.compressTabs = true;
+	EXPECT_EQ(m_view.GetSelectedIndex(), 7);
+	EXPECT_GE(m_testApi.GetTabRect(0).left, 0);
+	EXPECT_LE(m_testApi.GetTabRect(7).right, 400);
+}
+
+TEST_F(TabViewTest, CompressionUpdatesAfterResizeRenameAndClose)
+{
+	MoveWindow(m_view.GetHWND(), 0, 0, 2000, 30, false);
+	auto items = AddTabs({ L"A", L"A much longer folder name" });
+	auto original = m_testApi.GetTabRect(0);
+	EXPECT_LT(original.right - original.left,
+		m_testApi.GetTabRect(1).right - m_testApi.GetTabRect(1).left);
+
+	MoveWindow(m_view.GetHWND(), 0, 0, 240, 30, false);
+	EXPECT_LE(m_testApi.GetTabRect(1).right, 240);
+	MoveWindow(m_view.GetHWND(), 0, 0, 2000, 30, false);
+	EXPECT_EQ(m_testApi.GetTabRect(0).right - m_testApi.GetTabRect(0).left,
+		original.right - original.left);
+
+	MoveWindow(m_view.GetHWND(), 0, 0, 400, 30, false);
+	items[0]->SetTitle(std::wstring(200, L'A'));
+	EXPECT_LE(m_testApi.GetTabRect(1).right, 400);
+	m_view.RemoveTab(0);
+	EXPECT_LT(m_testApi.GetTabRect(0).right - m_testApi.GetTabRect(0).left, 400);
+}
+
+TEST_F(TabViewTest, CompressionUpdatesAfterFontChange)
+{
+	MoveWindow(m_view.GetHWND(), 0, 0, 400, 60, false);
+	AddTabs(std::vector<std::wstring>(8, L"A long folder name"));
+	auto original = m_testApi.GetTabRect(0);
+	m_config.mainFont = CustomFont(L"Segoe UI", 20);
+	auto enlarged = m_testApi.GetTabRect(0);
+	EXPECT_GT(enlarged.bottom - enlarged.top, original.bottom - original.top);
+	EXPECT_LE(m_testApi.GetTabRect(7).right, 400);
 }
 
 TEST_F(TabViewTest, CloseButtonClick)
@@ -364,4 +444,27 @@ TEST_F(TabViewPaintTest, Paint)
 
 	m_view.RemoveTab(3);
 	PerformPaintTest(ChangeType::ChangeExpected);
+}
+
+TEST_F(TabViewPaintTest, PaintCompressedTabs)
+{
+	MoveWindow(m_view.GetHWND(), 0, 0, 1200, 30, false);
+	for (int index = 3; index < 77; index++)
+	{
+		m_view.AddTab(std::make_unique<TestTabViewItem>(L"A long folder name", m_imageIndex),
+			index);
+	}
+	m_view.SelectTabAtIndex(75);
+	PerformPaintTest(ChangeType::ChangeExpected);
+	PerformPaintTest(ChangeType::ChangeNotExpected);
+}
+
+TEST_F(TabViewPaintTest, UncompressedShortTabsKeepCloseButtons)
+{
+	m_config.compressTabs = false;
+	m_view.AddTab(std::make_unique<TestTabViewItem>(L"A", m_imageIndex), 3);
+	MoveWindow(m_view.GetHWND(), 0, 0, 2000, 30, false);
+	auto layout = m_testApi.GetTabContentLayout(3);
+	EXPECT_FALSE(IsRectEmpty(&layout.closeButton));
+	EXPECT_GE(layout.text.right, layout.text.left);
 }

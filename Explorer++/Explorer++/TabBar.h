@@ -54,6 +54,7 @@ public:
 	TabBarView *GetView();
 
 	void CreateNewTabInDefaultDirectory(const TabSettings &tabSettings);
+	Tab &CreateDeferredDeviceTab(const TabStorageData &storage);
 	Tab &CreateNewTab(const std::wstring &directory, const TabSettings &tabSettings = {},
 		const FolderSettings *folderSettings = nullptr,
 		const FolderColumns *initialColumns = nullptr);

@@ -32,4 +32,5 @@ TEST_F(ConfigRegistryStorageTest, OpenZipFilesSettingMigration)
 	ConfigRegistryStorage::Load(m_applicationTestKey.get(), loadedConfig);
 
 	EXPECT_TRUE(loadedConfig.openContainerFiles);
+	EXPECT_TRUE(loadedConfig.compressTabs.get());
 }

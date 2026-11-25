@@ -9,9 +9,40 @@
 #include "Pidl.h"
 #include "WilExtraTypes.h"
 #include <wil/com.h>
+#include <cstring>
+#include <cwctype>
 
 namespace
 {
+
+bool PidlContainsString(PCIDLIST_ABSOLUTE pidl, std::wstring_view text)
+{
+	if (!pidl)
+	{
+		return false;
+	}
+	auto *bytes = reinterpret_cast<const unsigned char *>(pidl);
+	auto size = ILGetSize(pidl);
+	for (size_t offset = 0; offset + text.size() * sizeof(wchar_t) <= size; offset++)
+	{
+		bool matches = true;
+		for (size_t i = 0; i < text.size(); i++)
+		{
+			wchar_t character;
+			std::memcpy(&character, bytes + offset + i * sizeof(wchar_t), sizeof(character));
+			if (towlower(character) != text[i])
+			{
+				matches = false;
+				break;
+			}
+		}
+		if (matches)
+		{
+			return true;
+		}
+	}
+	return false;
+}
 
 class FileSystemBindData :
 	public winrt::implements<FileSystemBindData, IFileSystemBindData, winrt::non_agile>
@@ -37,6 +68,12 @@ private:
 	WIN32_FIND_DATA m_findData;
 };
 
+}
+
+bool IsPortableDevicePidl(PCIDLIST_ABSOLUTE pidl)
+{
+	return PidlContainsString(pidl, L"\\\\?\\")
+		&& PidlContainsString(pidl, PORTABLE_DEVICE_INTERFACE_GUID);
 }
 
 std::string EncodePidlToBase64(const PidlAbsolute &pidl)

@@ -270,7 +270,14 @@ void BrowserCommandController::ExecuteCommand(int command, OpenFolderDisposition
 		break;
 
 	case IDM_VIEW_REFRESH:
-		GetActiveShellBrowser()->GetNavigationController()->Refresh();
+		if (auto &tab = m_browser->GetActiveTabBar()->GetSelectedTab(); tab.GetDeferredDevice())
+		{
+			tab.ReconnectDevice();
+		}
+		else
+		{
+			GetActiveShellBrowser()->GetNavigationController()->Refresh();
+		}
 		break;
 
 	case IDM_VIEW_AUTOSIZECOLUMNS:
